@@ -9,7 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 sapply(c("dplyr", "ggplot2", "data.table"), require, character=TRUE)
-source("Utils.R")
+source("./Functions/Utils.R")
 DefPlotPars()
 ```
 
@@ -113,19 +113,15 @@ while (any(xdt$y!=xdt$y_pred)) {
 }
 ```
 
+1.8 and 1.9 in-text 
+```{r}
+cat("Binom prob", pbinom(1, size=10, prob=0.9))
+hoeff_prob <- function(N, eps) 2*exp(-2*eps^2*N)
+cat("\n Hoeffding prob", hoeff_prob(10, 1))
+```
+
 
 # Chapter 2 #
-
-# Hoeffding inequality  
-
-generalization error = diff between $E_{in}$ and $E_{out}$, hoeffding is one way to quantify this. does so via probabilistic bound. can think of it as  
-- pick a tolerance delta like .05  
-- say w p = 1 - delta that 
-$E_{out}(g) \leq E_{in}(g) + \sqrt{{1/2N \ ln \ 2M /\delta}}$
-
-where M is the size of hypothesis set  
-
-can think of $\sqrt{{1/2N \ ln \ 2M /\delta}}$ as some $\epsilon$ added to E_in  
 
 ```{r}
 # Flip 1k fair coints and store the outputs in a matrix

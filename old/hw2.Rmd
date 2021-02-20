@@ -1,0 +1,174 @@
+---
+title: 'Homeworks'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+sapply(c("dplyr", "ggplot2", "data.table"), require, character=TRUE)
+source("Utils.R")
+DefPlotPars()
+```
+
+# Chapter 1 #
+
+## (3)  
+- 2 bags each w 2 balls. one = 2 black balls (b1), other black + white (b2)
+- pick random bag + random ball therein: it's black  
+- pick other ball from same bag. chance it's black?  
+
+100% chance black | b1 
+50% chance black | b2  
+
+$p(b1|black_1) \propto p(black_1|b1) \ [1] \  p(b1) [1/2]$ = .5 
+
+$p(b2|black_1) \propto p(black_1|b2) \ [1/2] \  p(b2) [1/2]$ = .25  
+
+ So 2/3 chance it's black  
+```{r}
+.5 / .75 # Chance picked the first bag 
+.25/.75 # Chance picked the second bag - in which case it's white  
+```
+
+## (4)    
+
+```{r}
+p_red <- .55 
+.45^10 # 4. [b]
+```
+
+## Perceptron problems 1.7-1.10  
+```{r}
+### Define points for line ###
+DefLinePts <- function() data.frame(matrix(runif(4, -1, 1), 2)) %>% setNames(c("pt1", "pt2"))
+line_pts <- DefLinePts()
+```
+
+```{r}
+# Col 1 and 2 are resp x and y axis bounds
+x1_bounds <- sort(line_pts[, 1])
+x2_bounds <- sort(line_pts[, 2])
+```
+
+
+```{r}
+n <- 10 # 1.7  
+n <- 100 # 1.8 
+n <- 1e3 # testing
+x1 <- runif(n, x1_bounds[1], x1_bounds[2])
+x2 <- runif(n, x2_bounds[1], x2_bounds[2])
+xdt <- data.table("x_int"=0, x1, x2)
+# Find the slope of line  
+slope <- (line_pts[2, 2]-line_pts[1, 2])/(line_pts[2, 1]-line_pts[1, 1])
+if (slope < 0) {
+  # Find points along the line in place of emp data by multiplying
+  # coefs by slope and subtracting from x2 max
+  on_line <- max(xdt$x2) - (min(xdt$x1)-xdt$x1)*slope
+} else {
+  # Same from y2 min 
+  on_line <- min(xdt$x2) - (min(xdt$x1)-xdt$x1)*slope
+}
+# Sanity check we're on the line (mas or menos precision error?)
+xdt$on_line <- on_line
+ggplot(xdt, aes(x1, on_line)) + 
+  geom_point(pch=21, fill="white", size=6) + 
+  geom_line(data=line_pts, aes(pt1, pt2)) + ga + ap
+```
+
+
+```{r}
+xdt$y <- ifelse(xdt[1:nrow(xdt), "x2"] < xdt[1:nrow(xdt), "on_line"], -1, 1)
+xdt$on_line <- NULL
+# Plot with classification
+ggplot(xdt, aes(x1, x2, fill=as.factor(y))) + 
+  geom_point(pch=21, size=6) + 
+  geom_line(inherit.aes=FALSE, linetype="dashed", color="black", data=line_pts, size=2, aes(pt1, pt2)) + 
+  ga + ap + scale_fill_manual(values=cf_vals)
+```
+
+### Run perceptron  
+
+weight update rule = $w(t) = w(t) + x(t)y(t)$  
+
+
+```{r}
+w <- rep(0, ncol(line_pts)+1) # Init weights (dim + bias)
+xdt$y_pred <- 1 # Wasn't clear on how to iteratively work with y so thanks to Ivan's code for this
+weights <- list() # Store so can look at dynamics
+i <- 0
+## Run til convergence ##
+while (any(xdt$y!=xdt$y_pred)) { 
+  i <- i + 1
+  rando <- round(runif(1, 1, nrow(xdt)), 0)
+  obs <- data.frame(xdt[rando, ]) # Pick random observation 
+  x_rand <- obs[grep("x", names(obs))]
+  w <- w + as.numeric(x_i)*as.numeric(xdt$y[rando]) # Weight update
+  weights[[i]] <- w
+  # Update classification if misclassified 
+  if (!obs$y==obs$y_pred) xdt$y_pred[rando] <- sign(t(as.numeric(w)) %*% as.numeric(x_rand))#; print(xdt$y_pred[rando]) }
+  #print(xdt$y==xdt$y_pred)
+}
+```
+
+1.8 and 1.9 in-text 
+```{r}
+cat("Binom prob", pbinom(1, size=10, prob=0.9))
+hoeff_prob <- function(N, eps) 2*exp(-2*eps^2*N)
+cat("\n Hoeffding prob", hoeff_prob(10, 1))
+```
+
+
+# Chapter 2 #
+
+```{r}
+# Flip 1k fair coints and store the outputs in a matrix
+coin_outs <- list()
+for (exp in 1:1000) coin_outs[[exp]] <- round(runif(10, 0, 1), 0)
+coin_mat <- matrix(unlist(coin_outs), nrow=1000)
+```
+
+
+```{r}
+RunCoinExp <- function(x) {
+  ### Run one 1k virtual coin fair experiment and store v1, vrand, vmin ###
+  # Flip 1k fair coins and store the outputs in a matrix #
+  #cat("\n Experiment", x)
+  coin_outs <- list()
+  for (toss_seq in 1:1000) coin_outs[[toss_seq]] <- round(runif(10, 0, 1), 0)
+  cm <- matrix(unlist(coin_outs), nrow=1000) # Matrix of all outcomes
+  # Find the sequences for our 3 coins #
+  c1 <- cm[1, ]
+  c_rand <- cm[round(runif(1, 1, 1000), 0), ]
+  # Coin w fewest heads, taking first in case of tie
+  c_min <- cm[which(rowSums(cm)==min(rowSums(cm)))[1], ]
+  # Calculate proportions for each coin #
+  v_1_i <- sum(c1)/length(c1)
+  v_rand_i <- sum(c_rand)/length(c_rand)
+  v_min_i <- sum(c_min)/length(c_min)
+data.table(v_1_i, v_rand_i, v_min_i) 
+}
+# Run n experiments
+n_exps <- 1e4 # Note two orders of magnitude lower than book rec bc even this takes a while
+exp_out <- lapply(1:n_exps, function(x) RunCoinExp(x)) %>% bind_rows()
+exp_out
+hist(exp_out$v_min_i)
+```
+
+
+# Linear regression   
+```{r}
+# Define points for line 
+line_pts <- data.frame(matrix(runif(4, -1, 1), 2)) %>% setNames(c("x", "y"))
+ggplot(line_pts, aes(x, y)) +
+  geom_line() + ga + ap
+
+n <- 100
+train_pts <- runif(n, min(line_pts), max(line_pts))
+train_pts
+
+```
+
+
