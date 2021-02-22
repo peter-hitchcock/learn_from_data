@@ -206,19 +206,38 @@ vis
 ```
 
 
+Run one example  
 ```{r}
 line_pts <- DefLinePts()
-xdt <- GenXPointsAndY(line_pts, 100) # Start out with linear separability 
+xdt <- GenXPointsAndY(line_pts, 10000) # Start out with linear separability 
 SanityCheck(xdt)
 Vis(xdt)
-```
-
-
-```{r}
 X <- as.matrix(xdt %>% select(contains("x")))
 y <- as.matrix(xdt %>% select("y"))
 X_cross <- solve(t(X) %*% X) %*% t(X) # X_cross (pseudo inverse) = (X^T X)^-1 * X^T
-beta_hats <- X_cross %*% y # Fasten hat firmly on
+w_lin <- X_cross %*% y
+y_hat <- X %*% w_lin
+y_class <- ifelse(y < 0, -1, 1) 
+#which(y_class == y)
+E_in <- 1 - length(which(y_class == y))/length(y)
+E_in
 ```
+Package in function  
+```{r}
+line_pts <- DefLinePts()
+xdt <- GenXPointsAndY(line_pts, 10000) # Start out with linear separability 
+SanityCheck(xdt)
+Vis(xdt)
+X <- as.matrix(xdt %>% select(contains("x")))
+y <- as.matrix(xdt %>% select("y"))
+X_cross <- solve(t(X) %*% X) %*% t(X) # X_cross (pseudo inverse) = (X^T X)^-1 * X^T
+w_lin <- X_cross %*% y
+y_hat <- X %*% w_lin
+y_class <- ifelse(y < 0, -1, 1) 
+#which(y_class == y)
+E_in <- 1 - length(which(y_class == y))/length(y)
+E_in
+```
+
 
 

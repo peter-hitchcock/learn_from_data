@@ -79,7 +79,7 @@ $$\nabla E_{in}(w)=\textbf{0}$$
 - we can actually get the unique solution (if invertible) via
 ---
 ***LR Algo***
--  constructing a matrix of the predictors X 
+-  constructing a matrix of the predictors X  
 - computing $X^{pseudo} = X^T(X^T X^T)^{-1}$
 - then  $w_{lin}=X^{pseudo}y$
 ---
