@@ -4,6 +4,7 @@ RunLRExp <- function(n, line_pts=0) {
   # n = no. data points to use each exp ###
   set.seed(runif(1, 1, 1000))
   # Generate line pts if don't already have them 
+  #browser()
   if (!line_pts) line_pts <- DefLinePts()
   xdt <- GenXPointsAndY(line_pts, n) 
   p <- ggplot(xdt, aes(x1, x2, fill=as.factor(y))) + 
@@ -22,5 +23,4 @@ RunLRExp <- function(n, line_pts=0) {
   E_in <- 1 - length(which(y_class == y))/length(y)
   stuff_to_keep <- list("plots"=plots, "w_lin"=t(w_lin), "xdt"=xdt, "E_in"=E_in, "line_pts"=line_pts)
 }
-#lr_in_sample_res <- foreach(1:10) %dopar% RunLRExp(100) # Parallelize
-lr_in_sample_res <- foreach(1:10) %do% RunLRExp(100)
+out_exp_res <- lapply(1:1000, function(i) RunLRExp(1000, line_pts[[i]]))

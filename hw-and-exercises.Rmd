@@ -270,7 +270,7 @@ line_pts <- map(res1, 5) # Get the line pts from experiment
 w_lin <- do.call(rbind, map(res1, 2))
 ```
 
-```{r}
+```{r, warning=FALSE}
 out_exp_res <- lapply(1:1000, function(i) RunLRExp(1000, line_pts[[i]]))
 ```
 
