@@ -8,7 +8,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-sapply(c("dplyr", "ggplot2", "data.table", "patchwork"), require, character=TRUE)
+sapply(c("dplyr", "ggplot2", "data.table", "patchwork", "foreach", "doParallel"), require, character=TRUE)
 source("./Functions/Utils.R")
 DefPlotPars()
 ```
@@ -195,21 +195,20 @@ SanityCheck <- function(xdt) {
   geom_line(data=line_pts, aes(pt1, pt2)) + ga + ap + ylab("")
 sanity_check
 }
-Vis <- function(xdt) {
-  ### Visualize ###
-  vis <- ggplot(xdt, aes(x1, x2, fill=as.factor(y))) + 
-    geom_point(pch=21, size=6) + 
-    geom_line(inherit.aes=FALSE, linetype="dashed", color="black", data=line_pts, size=2, aes(pt1, pt2)) + 
-    ga + ap + scale_fill_manual(values=cf_vals) + lp 
-vis  
-}
+# Vis <- function(xdt) {
+#   ### Visualize ###
+#   vis <- ggplot(xdt, aes(x1, x2, fill=as.factor(y))) + 
+#     geom_point(pch=21, size=6) + 
+#     geom_line(inherit.aes=FALSE, linetype="dashed", color="black", data=line_pts, size=2, aes(pt1, pt2)) + 
+#     ga + ap + scale_fill_manual(values=cf_vals) + lp 
+# vis  
+# }
 ```
-
 
 Run one example  
 ```{r}
 line_pts <- DefLinePts()
-xdt <- GenXPointsAndY(line_pts, 10000) # Start out with linear separability 
+xdt <- GenXPointsAndY(line_pts, 100) # Start out with linear separability 
 SanityCheck(xdt)
 Vis(xdt)
 X <- as.matrix(xdt %>% select(contains("x")))
@@ -217,27 +216,61 @@ y <- as.matrix(xdt %>% select("y"))
 X_cross <- solve(t(X) %*% X) %*% t(X) # X_cross (pseudo inverse) = (X^T X)^-1 * X^T
 w_lin <- X_cross %*% y
 y_hat <- X %*% w_lin
-y_class <- ifelse(y < 0, -1, 1) 
+y_class <- ifelse(y_hat < 0, -1, 1) 
 #which(y_class == y)
 E_in <- 1 - length(which(y_class == y))/length(y)
 E_in
 ```
-Package in function  
+Package up in function  
 ```{r}
-line_pts <- DefLinePts()
-xdt <- GenXPointsAndY(line_pts, 10000) # Start out with linear separability 
-SanityCheck(xdt)
-Vis(xdt)
-X <- as.matrix(xdt %>% select(contains("x")))
-y <- as.matrix(xdt %>% select("y"))
-X_cross <- solve(t(X) %*% X) %*% t(X) # X_cross (pseudo inverse) = (X^T X)^-1 * X^T
-w_lin <- X_cross %*% y
-y_hat <- X %*% w_lin
-y_class <- ifelse(y < 0, -1, 1) 
-#which(y_class == y)
-E_in <- 1 - length(which(y_class == y))/length(y)
-E_in
+registerDoParallel(round(detectCores()*2/3)) 
+```
+
+```{r}
+RunLRExp <- function(n, line_pts=0) {
+  ### Run linear regression experiment including generating random points, either #
+  # inputting the line marker (E_out) or generating it #
+  # n = no. data points to use each exp ###
+  set.seed(runif(1, 1, 1000))
+  # Generate line pts if don't already have them 
+  if (!line_pts) line_pts <- DefLinePts()
+  xdt <- GenXPointsAndY(line_pts, n) 
+  p <- ggplot(xdt, aes(x1, x2, fill=as.factor(y))) + 
+    geom_point(pch=21, size=6) + 
+    geom_line(inherit.aes=FALSE, linetype="dashed", color="black", data=line_pts, size=2, aes(pt1, pt2)) + 
+    ga + ap + scale_fill_manual(values=cf_vals) + lp 
+  plots <- p
+  # Matrix ops
+  X <- as.matrix(xdt %>% select(contains("x")))
+  y <- as.matrix(xdt %>% select("y"))
+  X_cross <- solve(t(X) %*% X) %*% t(X) # X_cross (pseudo inverse) = (X^T X)^-1 * X^T
+  w_lin <- X_cross %*% y
+  y_hat <- X %*% w_lin
+  # Classify pts and calculate error 
+  y_class <- ifelse(y_hat < 0, -1, 1) 
+  E_in <- 1 - length(which(y_class == y))/length(y)
+stuff_to_keep <- list("plots"=plots, "w_lin"=t(w_lin), "xdt"=xdt, "E_in"=E_in, "line_pts"=line_pts)
+}
 ```
 
 
+Run 1k experiments each w N=100
+```{r}
+res1 <- foreach(1:1000) %do% RunLRExp(100)
+E_in <- unlist(map(res1, 4))
+```
+
+Question 5 hw 2 
+```{r}
+mean(E_in) # q5 - c
+```
+
+```{r}
+line_pts <- map(res1, 5) # Get the line pts from experiment 
+w_lin <- do.call(rbind, map(res1, 2))
+```
+
+```{r}
+out_exp_res <- lapply(1:1000, function(i) RunLRExp(1000, line_pts[[i]]))
+```
 
