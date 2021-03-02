@@ -90,6 +90,8 @@ $$\nabla E_{in}(w)=\textbf{0}$$
 $$\sum_{i=0}^{d} w_i x_i = \textbf{w}^T\textbf{x}$$
     - linear bc of the $w_i's$ ; from the algo's perspective, the x's are just constants. so we can transform them however we want  
     - and this is often desirable bc we may not expect any predictor to linearly bear on outcome eg. years in a residence regressed on credit - is it really plausible 40 yrs is twice as trustworthy as 20?  
+
+# lec 5 - error and noise  
     
 
 ---

@@ -8,14 +8,15 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-sapply(c("dplyr", "ggplot2", "data.table", "patchwork", "foreach", "doParallel"), require, character=TRUE)
+sapply(c("dplyr", "ggplot2", "data.table", "patchwork", "foreach", "doParallel", "purrr"), require, character=TRUE)
 source("./Functions/Utils.R")
 DefPlotPars()
 ```
 
-# Chapter 1 #
+# Chapter 1  
 
-## (3)  
+## (3)   
+
 - 2 bags each w 2 balls. one = 2 black balls (b1), other black + white (b2)
 - pick random bag + random ball therein: it's black  
 - pick other ball from same bag. chance it's black?  
@@ -93,7 +94,6 @@ ggplot(xdt, aes(x1, x2, fill=as.factor(y))) +
 
 weight update rule = $w(t) = w(t) + x(t)y(t)$  
 
-
 ```{r}
 w <- rep(0, ncol(line_pts)+1) # Init weights (dim + bias)
 xdt$y_pred <- 1 # Wasn't clear on how to iteratively work with y so thanks to Ivan's code for this
@@ -124,7 +124,7 @@ cat("\n Hoeffding prob", hoeff_prob(10, 1))
 # Chapter 2 #
 
 ```{r}
-# Flip 1k fair coints and store the outputs in a matrix
+# Flip 1k fair coins and store the outputs in a matrix
 coin_outs <- list()
 for (exp in 1:1000) coin_outs[[exp]] <- round(runif(10, 0, 1), 0)
 coin_mat <- matrix(unlist(coin_outs), nrow=1000)
@@ -159,6 +159,7 @@ hist(exp_out$v_min_i)
 
 
 # Linear regression   
+
 ```{r}
 GenXPointsAndY <- function(line_pts, n=20, sign_flip_prop=0) {
   ### Generate points about line drawn in [-1,1]x[-1,1] and #
@@ -195,82 +196,177 @@ SanityCheck <- function(xdt) {
   geom_line(data=line_pts, aes(pt1, pt2)) + ga + ap + ylab("")
 sanity_check
 }
-# Vis <- function(xdt) {
-#   ### Visualize ###
-#   vis <- ggplot(xdt, aes(x1, x2, fill=as.factor(y))) + 
-#     geom_point(pch=21, size=6) + 
-#     geom_line(inherit.aes=FALSE, linetype="dashed", color="black", data=line_pts, size=2, aes(pt1, pt2)) + 
-#     ga + ap + scale_fill_manual(values=cf_vals) + lp 
-# vis  
-# }
-```
-
-Run one example  
-```{r}
-line_pts <- DefLinePts()
-xdt <- GenXPointsAndY(line_pts, 100) # Start out with linear separability 
-SanityCheck(xdt)
-Vis(xdt)
-X <- as.matrix(xdt %>% select(contains("x")))
-y <- as.matrix(xdt %>% select("y"))
-X_cross <- solve(t(X) %*% X) %*% t(X) # X_cross (pseudo inverse) = (X^T X)^-1 * X^T
-w_lin <- X_cross %*% y
-y_hat <- X %*% w_lin
-y_class <- ifelse(y_hat < 0, -1, 1) 
-#which(y_class == y)
-E_in <- 1 - length(which(y_class == y))/length(y)
-E_in
 ```
 Package up in function  
 ```{r}
-registerDoParallel(round(detectCores()*2/3)) 
+#registerDoParallel(round(detectCores()*2/3)) 
 ```
 
 ```{r}
-RunLRExp <- function(n, line_pts=0) {
+RunLRExp <- function(n, line_pts=0, w_lin=0, misclass_prop=0) {
   ### Run linear regression experiment including generating random points, either #
   # inputting the line marker (E_out) or generating it #
   # n = no. data points to use each exp ###
   set.seed(runif(1, 1, 1000))
   # Generate line pts if don't already have them 
   if (!line_pts) line_pts <- DefLinePts()
-  xdt <- GenXPointsAndY(line_pts, n) 
+  xdt <- GenXPointsAndY(line_pts, n, sign_flip_prop=misclass_prop) 
   p <- ggplot(xdt, aes(x1, x2, fill=as.factor(y))) + 
     geom_point(pch=21, size=6) + 
     geom_line(inherit.aes=FALSE, linetype="dashed", color="black", data=line_pts, size=2, aes(pt1, pt2)) + 
     ga + ap + scale_fill_manual(values=cf_vals) + lp 
   plots <- p
-  # Matrix ops
+  # Matrix ops #
   X <- as.matrix(xdt %>% select(contains("x")))
   y <- as.matrix(xdt %>% select("y"))
-  X_cross <- solve(t(X) %*% X) %*% t(X) # X_cross (pseudo inverse) = (X^T X)^-1 * X^T
-  w_lin <- X_cross %*% y
+  # If it's the train set, calculate w_lin on these data, else = test so use the w_lin arg supplying
+  # betas from training set on these lines
+  if (!w_lin) {
+    X_cross <- solve(t(X) %*% X) %*% t(X) # X_cross (pseudo inverse) = (X^T X)^-1 * X^T
+    w_lin <- X_cross %*% y  
+  }
   y_hat <- X %*% w_lin
   # Classify pts and calculate error 
   y_class <- ifelse(y_hat < 0, -1, 1) 
-  E_in <- 1 - length(which(y_class == y))/length(y)
-stuff_to_keep <- list("plots"=plots, "w_lin"=t(w_lin), "xdt"=xdt, "E_in"=E_in, "line_pts"=line_pts)
+  # This is etiher E in or E out depending on what's being fitted
+  E_in_or_out <- 1 - length(which(y_class == y))/length(y) 
+stuff_to_keep <- list("plots"=plots, "w_lin"=t(w_lin), "xdt"=xdt, "E_measure"=E_in_or_out, "line_pts"=line_pts)
 }
 ```
 
 
-Run 1k experiments each w N=100
+Train: On 1k experiments each w N=100
 ```{r}
 res1 <- foreach(1:1000) %do% RunLRExp(100)
 E_in <- unlist(map(res1, 4))
 ```
 
-Question 5 hw 2 
+**Question 5 hw 2**   
 ```{r}
-mean(E_in) # q5 - c
+mean(E_in) 
 ```
 
 ```{r}
+# Extract fits from train set 
 line_pts <- map(res1, 5) # Get the line pts from experiment 
 w_lin <- do.call(rbind, map(res1, 2))
 ```
 
+Run on test set  
 ```{r, warning=FALSE}
-out_exp_res <- lapply(1:1000, function(i) RunLRExp(1000, line_pts[[i]]))
+out_exp_res <- lapply(1:1000, function(i) RunLRExp(1000, line_pts=line_pts[[i]], w_lin=as.numeric(w_lin[i, ])))
 ```
+
+**Question 6  hw 2**  
+
+```{r}
+E_out <- mean(unlist(map(out_exp_res, 4))) # Higher than E_in but closer to c - would think it's sposed to be closer to d?
+E_out
+```
+
+**Rerun with 15% misclassified points instead of linear separability**    
+```{r, warning=FALSE}
+res2 <- foreach(1:1000) %do% RunLRExp(100, line_pts=0, w_lin=0, misclass_prop=.15)
+E_in_2 <- unlist(map(res2, 4))
+mean(E_in) 
+# Extract fits from train set 
+line_pts_mat <- map(res1, 5) # Get the line pts from experiment 
+w_lin <- do.call(rbind, map(res1, 2))
+#Run on test set  
+out_exp_res <- lapply(1:1000, function(i) RunLRExp(1000, line_pts=line_pts_mat[[i]], w_lin=as.numeric(w_lin[i, ])))
+E_out <- mean(unlist(map(out_exp_res, 4))) # Higher than E_in but closer to c - would think it's sposed to be closer to d?
+E_out
+```
+
+Can't be right, must be a bug  
+```{r, warning=FALSE}
+res2 <- foreach(1:1000) %do% RunLRExp(100, line_pts=0, w_lin=0, misclass_prop=.40)
+E_in_2 <- unlist(map(res2, 4))
+mean(E_in) 
+# Extract fits from train set 
+line_pts_mat <- map(res1, 5) # Get the line pts from experiment 
+w_lin <- do.call(rbind, map(res1, 2))
+#Run on test set  
+out_exp_res <- lapply(1:1000, function(i) RunLRExp(1000, line_pts=line_pts_mat[[i]], w_lin=as.numeric(w_lin[i, ])))
+E_out <- mean(unlist(map(out_exp_res, 4))) # Higher than E_in but closer to c - would think it's sposed to be closer to d?
+E_out
+```
+
+hw2, Q7
+```{r}
+RunPerceptron <- function(line_pts, xdt, init_w=NULL, verbose=NULL) {
+  ### Run perceptron algo until convergence. Init w are initial weights if these come pre-specified ###
+  xdt$y_pred <- 1 # Wasn't clear on how to iteratively work with y so thanks to Ivan's code for this
+  if (!is.null(init_w)) w <- rep(0, ncol(line_pts)+1) # Init weights (dim + bias)
+  weights <- list() # Store so can look at dynamics
+  i <- 0
+  if (!is.null(verbose)) cat("\n Iter =", i)
+  ## Run til convergence ##
+  while (any(xdt$y!=xdt$y_pred)) { 
+    i <- i + 1
+    rando <- round(runif(1, 1, nrow(xdt)), 0)
+    obs <- data.frame(xdt[rando, ]) # Pick random observation 
+    x_rand <- obs[grep("x", names(obs))]
+    w <- w + as.numeric(x_i)*as.numeric(xdt$y[rando]) # Weight update
+    weights[[i]] <- w
+    # Update classification if misclassified 
+    if (!obs$y==obs$y_pred) xdt$y_pred[rando] <- sign(t(as.numeric(w)) %*% as.numeric(x_rand))
+  }  
+list("weights"=weights, "iter"=i, "y_pred"=y_pred)
+}
+```
+
+```{r}
+line_pts <- DefLinePts()
+xdt <- GenXPointsAndY(line_pts, 50) 
+out <- RunPerceptron(line_pts=line_pts[[i]], xdt)
+```
+
+
+# Lec 5  
+
+growth fx - m counting the most dichotomies on N points  
+
+our inequality for confidence that our generalization is reasonable is  
+$P[E_{in}-E_{out}] > \epsilon \leq 2 M e^{-2 \epsilon ^2 N}$  
+
+now bc M's often infinite we want to replace it w a more realistic growth fx  so $m_{\mathcal{H}}(N) \ replaces \ M$  
+is we can get $m_{\mathcal{H}}(N)$ to be polynomial we're in awesome shape. why? because 
+$e^{-2 \epsilon ^2 N}$ will get super low even w whatever $\epsilon$ given high enough N and "kill the heck" out of any polynomial we throw in front  
+
+```{r}
+GenInequalityProbs <- function(N, eps, term1fx) {
+  ### Term 1 is what's replacing our constant M ###
+  term2 <- exp(-2^(eps^2)*N)
+  term1 <- term1fx(N)
+  cat('\n\n', N)
+  cat("\n term1", term1, "\n term2", term2, "\n Probability:", term2 * term1 * 2)
+}
+# Some example polynomial function 
+SPF <- function(N) N^2 + 5*N + 3
+# Some example exponential function 
+EF <- function(N) 2^N
+```
+
+```{r}
+Ns <- seq(1, 1e3, 100)
+Ns
+```
+
+```{r}
+apply(data.table(Ns), 1, function(x) GenInequalityProbs(x, eps=.5, term1fx=SPF))
+apply(data.table(Ns), 1, function(x) GenInequalityProbs(x, eps=.001, term1fx=SPF))
+```
+
+```{r}
+apply(data.table(Ns), 1, function(x) GenInequalityProbs(x, eps=.5, term1fx=EF))
+apply(data.table(Ns), 1, function(x) GenInequalityProbs(x, eps=1e-8, term1fx=EF))
+```
+
+Break point: point where you fail to get all possible hypotheses 
+ie. point where there's no k points that can shatter H  
+then k's a break point  
+
+If there's a break point, growth is polynomial  [? ]
+
 
