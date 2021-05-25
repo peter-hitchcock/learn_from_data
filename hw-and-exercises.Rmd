@@ -58,7 +58,7 @@ x2_bounds <- sort(line_pts[, 2])
 ```{r}
 n <- 10 # 1.7  
 n <- 100 # 1.8 
-n <- 1e3 # testing
+#n <- 1e3 # testing
 x1 <- runif(n, x1_bounds[1], x1_bounds[2])
 x2 <- runif(n, x2_bounds[1], x2_bounds[2])
 xdt <- data.table("x_int"=0, x1, x2)
@@ -328,7 +328,7 @@ out <- RunPerceptron(line_pts=line_pts[[i]], xdt)
 growth fx - m counting the most dichotomies on N points  
 
 our inequality for confidence that our generalization is reasonable is  
-$P[E_{in}-E_{out}] > \epsilon \leq 2 M e^{-2 \epsilon ^2 N}$  
+$$P[E_{in}-E_{out}] > \epsilon \leq 2 M e^{-2 \epsilon ^2 N}$$  
 
 now bc M's often infinite we want to replace it w a more realistic growth fx  so $m_{\mathcal{H}}(N) \ replaces \ M$  
 is we can get $m_{\mathcal{H}}(N)$ to be polynomial we're in awesome shape. why? because 
@@ -368,5 +368,156 @@ ie. point where there's no k points that can shatter H
 then k's a break point  
 
 If there's a break point, growth is polynomial  [? ]
+
+## HW 5  
+
+1. 
+
+```{r}
+expected_error <- function(N, d=8, sigma=.1) sigma^2 * (1-((d+1)/N))
+# 100
+expected_error(c(10, 25, 100, 500, 1e3))
+```
+
+
+## Logistic regression problem  
+
+Find two random uniformly distributed points from x. These will be the boundary where y +/- 1
+```{r}
+line_pts <- DefLinePts()
+x1_bounds <- sort(line_pts[, 1])
+x2_bounds <- sort(line_pts[, 2])
+x1_bounds
+x2_bounds
+```
+
+
+Generate 100 data points in the range 
+
+```{r}
+pts <- do.call(rbind, foreach(1:100) %do% matrix(runif(2, -1, 1), 1))
+```
+
+```{r}
+n <- 100 
+#n <- 1e3 # testing
+x1 <- runif(n, x1_bounds[1], x1_bounds[2])
+x2 <- runif(n, x2_bounds[1], x2_bounds[2])
+```
+
+```{r}
+line_pts
+```
+
+Classify the training points based
+```{r}
+xdt <- data.table("x_int"=1, x1, x2)
+# Find the slope of line  
+slope <- (line_pts[2, 2]-line_pts[1, 2])/(line_pts[2, 1]-line_pts[1, 1])
+if (slope < 0) {
+  # Find points along the line in place of emp data by multiplying
+  # coefs by slope and subtracting from x2 max
+  on_line <- max(xdt$x2) - (min(xdt$x1)-xdt$x1)*slope
+} else {
+  # Same from y2 min 
+  on_line <- min(xdt$x2) - (min(xdt$x1)-xdt$x1)*slope
+}
+# Sanity check we're on the line (mas or menos precision error?)
+xdt$on_line <- on_line
+ggplot(xdt, aes(x1, on_line)) + 
+  geom_point(pch=21, fill="white", size=6) + 
+  geom_line(data=line_pts, aes(pt1, pt2)) + ga + ap
+
+# Assign everything above line -1 
+xdt$y <- ifelse(xdt[1:nrow(xdt), "x2"] < xdt[1:nrow(xdt), "on_line"], -1, 1)
+xdt$on_line <- NULL
+# Plot with classification
+ggplot(xdt, aes(x1, x2, fill=as.factor(y))) + 
+  geom_point(pch=21, size=6) + 
+  geom_line(inherit.aes=FALSE, linetype="dashed", color="black", data=line_pts, size=2, aes(pt1, pt2)) + 
+  ga + ap + scale_fill_manual(values=cf_vals)
+
+```
+
+```{r}
+w <- c(.1, .8)
+w
+x1 <- xdt$x1
+x2 <- xdt$x2
+y <- xdt$y
+eta <- .1
+dot_prod <- apply(matrix(cbind(x1, x2), ncol=2), 1, function(x) weights %*% x)
+
+denom <- 1 + exp(y * dot_prod)
+denom
+num <- y * matrix(cbind(x1, x2), ncol=2) # Not sure this is right 
+
+nabla_E_in <- -1/nrow(xdt)*sum(num/denom)
+
+
+
+```
+
+
+We don't have an analytic soluntion in logistic regresison, but can iteratively find the correct weights by minimizing error term via adding the gradient to the weights (proportional to a step size). The gradient is 
+
+$$\nabla E_{in} = - \frac{1}{N} \displaystyle\sum_{n=1}^N \frac{y_nx_n}{1 + e^{y_n \textbf{w}^T(t)x_n }}$$
+
+
+
+
+```{r}
+RunLogisticRegression <- function(xdt, w, step_size=.1, tolerance=.01) {
+  ### Iteratively improve weights until below tolerance ###
+  
+  running_tolerance <- 1e3
+  
+  # Vectorize
+  x1 <- xdt$x1
+  x2 <- xdt$x2
+  y <- xdt$y
+  
+  while (running_tolerance > tolerance) {
+    # Compute gradient 
+    dot_prod <- apply(matrix(cbind(1, x1, x2), ncol=3), 1, function(x) weights %*% x)
+    denom <- 1 + exp(y * dot_prod)
+    num <- y * matrix(cbind(1, x1, x2), ncol=3) # Not sure this is right 
+    nabla_E_in <- -1/nrow(xdt)*sum(num/denom)
+    
+    # Update learning rate weights 
+    learning_rate <- step_size * nabla_E_in
+    w_new <- w - learning_rate * nabla_E_in
+    running_tolerance <- norm(matrix(w_new - w))
+    cat("\n Tolerance", running_tolerance)
+    cat("\n New weights", w_new)
+    w <- w_new
+    
+  }
+w
+}
+```
+
+```{r}
+init_weights <- c(.5, .1, .9)
+```
+
+
+```{r}
+w <- RunLogisticRegression(xdt, c(0, 0, 0))
+w
+```
+
+
+```{r}
+RunLogisticRegression(xdt, weights)
+```
+
+```{r}
+RunLogisticRegression(xdt, w=c(.99, .99))
+```
+
+
+
+
 
 

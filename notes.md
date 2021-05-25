@@ -101,3 +101,35 @@ $$\sum_{i=0}^{d} w_i x_i = \textbf{w}^T\textbf{x}$$
 
 ---
 
+# lec 9 
+- we've ended up with idea that number of examples need is proportional to N examples needed  
+
+## nonlinear transformation wrap up - w an eye twd generalization issues  
+- nonlinear transofrmation 
+$x = (x_0, x_1, ... x_d) \rightarrow^{\phi} z = (z_0, z_1 ... z_d)$ - this is z space   
+
+## stochastic gradient descent for logistic regression  
+- using the taylor series approximation where we ignore all h.o.t. above the linear. we take a small step size $\eta$ because otherwise we might miss important info in the step from the h.o. contributions. we take the linear weight change times a unit vector $\hat{v}$ that just encodes the direction of the change. this gives us the change in $E_{in}$. we apply the neg so can minimize  
+
+$$\Delta E_{in} = -\eta\nabla E_{in}\textbf{w}(0) \hat{v}$$ 
+
+so we've an inner product between the weight and a unit vector. so abs most we'll get norm * weight vec (or neg * weight vec if the unit's negative). so we use the norm  
+
+$$ \ \ \ \\  \ \ \ \  \  \   \geq -\eta||\nabla E_{in}\textbf{w}(0) \hat{v}||$$
+
+and thus bc $\hat{v}$ is a unit vector  
+$$\hat{v} = \frac{\Delta E_{in}(\textbf{w}(0))}  {||\Delta E_{in}(\textbf{w}(0))||}$$ 
+
+# lec 10 - neural nets  
+- we'll do gradient descent in batches by using one example  
+
+- stochastic gradient descent (sgd) where we use an average. why?  
+    
+    - 1. cheaper computation bc we just need one example  
+    
+    - 2. randomization, which can be good when get stuck in local min  
+
+    - 3. simple - it's the simplest optimization you can think of  
+
+    
+    
